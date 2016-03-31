@@ -1,0 +1,23 @@
+#
+# SMEM driver configuration
+#
+
+menu "SHSMEM driver"
+
+comment "SHARP SMEM driver"
+
+config SHSMEM_CUST_SMARTPHONE
+	bool "Customize for smartphone"
+	depends on SHSYS_CUST
+        default n
+	help
+	  for smartphone
+
+config SHSMEM_CUST_TABLET
+	bool "Customize for tablet"
+	depends on SHSYS_CUST
+	default n
+	help
+	  for tablet
+
+endmenu

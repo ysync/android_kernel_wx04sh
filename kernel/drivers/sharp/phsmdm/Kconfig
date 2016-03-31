@@ -1,0 +1,11 @@
+#
+# PHS
+#
+
+menu "PHS_MDM"
+
+config PHS_MDM
+	tristate "PHS_MDM"
+	default n
+endmenu
+

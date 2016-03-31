@@ -1,0 +1,19 @@
+#
+# Proximity device configuration
+#
+# drivers/sharp/proximity/Kconfig
+
+menu "Proximity Configuration"
+
+config SENSORS_PROXIMITY
+	tristate "Proximity Sensor Driver"
+	default n
+
+config PROXIMITY_MODEL_TYPE
+	int "PROXIMITY MODEL TYPE"
+	depends on SENSORS_PROXIMITY
+	range 0 8
+	default "0"
+
+endmenu
+

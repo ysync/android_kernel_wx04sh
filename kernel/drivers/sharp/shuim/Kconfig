@@ -1,0 +1,15 @@
+#
+# SHUim device configuration
+#
+
+menu "SHUim driver"
+
+comment "SHARP Uim drivers"
+
+config SHUIM
+	bool "SHUim Support"
+	default y
+	help
+	  Uim Support.
+
+endmenu

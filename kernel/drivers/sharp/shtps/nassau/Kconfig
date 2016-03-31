@@ -1,0 +1,16 @@
+#
+# Sharp Touchscreen configuration
+#
+
+if TOUCHSCREEN_SHTPS
+	config SHTPS_NASSAU_DEV
+		tristate "Nassau Device"
+		default n
+		depends on TOUCHSCREEN_SHTPS
+
+	config SHTPS_NASSAU_TS2_001
+		tristate "Nassau TS2_001"
+		default n
+		depends on SHTPS_NASSAU_DEV
+
+endif # TOUCHSCREEN_SHTPS

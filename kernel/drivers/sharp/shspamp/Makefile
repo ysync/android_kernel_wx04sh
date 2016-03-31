@@ -1,0 +1,7 @@
+# CONFIG_SH_AUDIO_DRIVER newly created
+obj-$(CONFIG_SHSPAMP_TPA2028D1) += shspamp_tpa2028d1.o
+obj-$(CONFIG_SHSPAMP_YDA168B) += shspamp_yda168b.o
+obj-$(CONFIG_SHSPAMP_AK7811) += shspamp_ak7811.o
+#SH_AUDIO_DRIVER-> 02-141
+obj-$(CONFIG_SHRECEIVER_LM48560) += shreceiver_lm48560.o
+#SH_AUDIO_DRIVER<- 02-141

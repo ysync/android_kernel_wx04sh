@@ -1,0 +1,17 @@
+#
+# Sharp Touchscreen configuration
+#
+
+if TOUCHSCREEN_SHTPS
+
+	config SHTPS_TMA4XX_DEV
+		tristate "TMA4XX Device"
+		default n
+		depends on TOUCHSCREEN_SHTPS
+
+	config SHTPS_TMA4XX_TMA463_002
+		tristate "TMA4XX TMA463-002"
+		default n
+		depends on SHTPS_TMA4XX_DEV
+
+endif # TOUCHSCREEN_SHTPS
