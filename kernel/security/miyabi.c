@@ -38,16 +38,6 @@ static void record_rooted(void)
 	return;
 }
 
-static int miyabi_ptrace_access_check(struct task_struct *child, unsigned int mode)
-{
-	return -EPERM;
-}
-
-static int miyabi_ptrace_traceme(struct task_struct *parent)
-{
-	return -EPERM;
-}
-
 static struct vec
 {
 	const char *prefix;
@@ -681,8 +671,8 @@ static int miyabi_socket_setsockopt(struct socket *sock, int level, int optname)
 const struct security_operations miyabi_security_ops = {
 	"miyabi",
 
-	miyabi_ptrace_access_check,
-	miyabi_ptrace_traceme,
+	cap_ptrace_access_check,
+	cap_ptrace_traceme,
 	cap_capget,
 	cap_capset,
 	cap_capable,

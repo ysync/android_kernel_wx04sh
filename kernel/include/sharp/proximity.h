@@ -15,11 +15,28 @@
 /*
  * Definitions for GP2AP030A00F chip.
  */
+
+/* ------------------------------------------------------------------------- */
+/* SHARP PROXIMITY SENSOR DRIVER FOR KERNEL MODE                             */
+/* ------------------------------------------------------------------------- */
+
 #ifndef PROXIMITY_H
 #define PROXIMITY_H
 
 #include <linux/ioctl.h>
 
+/* ------------------------------------------------------------------------- */
+/* MACROS                                                                    */
+/* ------------------------------------------------------------------------- */
+
+#define SH_PROXIMITY_RESULT_FAILURE    -1
+#define SH_PROXIMITY_RESULT_SUCCESS    0
+
+#define SH_PROXIMITY_NEAR              0
+#define SH_PROXIMITY_FAR               7
+
+#define SH_PROXIMITY_ENABLE            1
+#define SH_PROXIMITY_DISABLE           0
 
 #define SH_PROXIMITY_I2C_DEVNAME	"proximity"
 #define SH_PROXIMITY_I2C_SLAVE		0x39
@@ -50,6 +67,14 @@
 #define ECS_IOCTL_HT_THRESHOLD_WRITE		_IOW(GP2AP030IO, 0x06, unsigned short)
 #define ECS_IOCTL_GET_D2_DATA		_IOR(GP2AP030IO, 0x07, unsigned short)
 
+/* ------------------------------------------------------------------------- */
+/* PROTOTYPES                                                                    */
+/* ------------------------------------------------------------------------- */
+int PROX_dataread_func(int *read_data);
+int PROX_dataread_disable_func(void);
+int PROX_stateread_func(int *state_data, int *read_data);
 #endif /* PROXIMITY_H */
 
-
+/* ------------------------------------------------------------------------- */
+/* END OF FILE                                                               */
+/* ------------------------------------------------------------------------- */

@@ -102,9 +102,10 @@ u32 msm_fb_msg_level = 7;
 /* Setting mddi_msg_level to 8 prints out ALL messages */
 u32 mddi_msg_level = 5;
 
-#ifdef CONFIG_SHLCDC_BOARD /* CUST_ID_00015 */ /* CUST_ID_00038 */ /* CUST_ID_00051 */ /* CUST_ID_00058 */ /* CUST_ID_00071 */ /* CUST_ID_00075 */ /* CUST_ID_00084 */ /* CUST_ID_00089 */ /* CUST_ID_00094 */ /* CUST_ID_00101 */
+#ifdef CONFIG_SHLCDC_BOARD /* CUST_ID_00015 */ /* CUST_ID_00038 */ /* CUST_ID_00051 */ /* CUST_ID_00058 */ /* CUST_ID_00071 */ /* CUST_ID_00075 */ /* CUST_ID_00084 */ /* CUST_ID_00089 */ /* CUST_ID_00094 */ /* CUST_ID_00101 */ /* CUST_ID_00188 */
 int overlay_start;
 int overlay_stop;
+int overlay_trick_execute = 0;
 static int overlay_state;
 int fps_low_mode = 0;
 int base_fps_low_mode = 0;

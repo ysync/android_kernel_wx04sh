@@ -43,13 +43,14 @@
 
 #define DSI_VIDEO_BASE	0xE0000
 
-#ifdef CONFIG_SHLCDC_BOARD /* CUST_ID_00051 */ /* CUST_ID_00058 */ /* CUST_ID_00089 */ /* CUST_ID_00095 */ /* CUST_ID_00096 */
+#ifdef CONFIG_SHLCDC_BOARD /* CUST_ID_00051 */ /* CUST_ID_00058 */ /* CUST_ID_00089 */ /* CUST_ID_00095 */ /* CUST_ID_00096 */ /* CUST_ID_00188 */
 extern int fps_low_mode;
 extern int base_fps_low_mode;
 extern void mdp_req_kickoff_pipe_debug(int flag);
 extern int overlay_start;
 extern int overlay_stop;
 extern void mdp_req_trace_dump(int mode);
+extern int overlay_trick_execute;
 #endif	/* CONFIG_SHLCDC_BOARD */
 
 static int first_pixel_start_x;
@@ -273,6 +274,12 @@ int mdp4_dsi_video_pipe_commit(int cndx, int wait)
 			pipe->pipe_used = 0; /* clear */
 		}
 	}
+#ifdef CONFIG_SHLCDC_BOARD /* CUST_ID_00188 */
+	if(overlay_trick_execute){
+		mdp_dma_abl_lut_set_overlay(vctrl->mfd->fbi);
+		overlay_trick_execute = 0;
+	}
+#endif /* CONFIG_SHLCDC_BOARD */ /* CUST_ID_00188 */
 
 	mdp4_mixer_stage_commit(mixer);
 

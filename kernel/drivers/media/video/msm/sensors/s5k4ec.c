@@ -913,6 +913,7 @@ static int s5k4ec_set_focus_area(struct msm_sensor_ctrl_t *s_ctrl, struct sensor
 
 	CDBG("%s focus_area.x=%d focus_area.dx=%d focus_area.y=%d focus_area.dy=%d\n", __func__, cdata->cfg.focus_area.x, cdata->cfg.focus_area.dx, cdata->cfg.focus_area.y, cdata->cfg.focus_area.dy);
 
+#if 0
 	if((s5k4ec_af_area_tbl[2].reg_data == (unsigned short)cdata->cfg.focus_area.x) &&
 		(s5k4ec_af_area_tbl[3].reg_data == (unsigned short)cdata->cfg.focus_area.y) &&
 		(s5k4ec_af_area_tbl[4].reg_data == (unsigned short)cdata->cfg.focus_area.dx) &&
@@ -922,6 +923,19 @@ static int s5k4ec_set_focus_area(struct msm_sensor_ctrl_t *s_ctrl, struct sensor
 		(s5k4ec_af_area_tbl[8].reg_data == (unsigned short)cdata->cfg.focus_area.dx) &&
 		(s5k4ec_af_area_tbl[9].reg_data == (unsigned short)cdata->cfg.focus_area.dy)){
 		CDBG("%s area is same = %d\n", __func__, rc);
+		return 0;
+	}
+#endif
+
+	if((abs(s5k4ec_af_area_tbl[2].reg_data - (unsigned short)cdata->cfg.focus_area.x)<200) &&
+	   (abs(s5k4ec_af_area_tbl[3].reg_data - (unsigned short)cdata->cfg.focus_area.y)<200) &&
+	   (abs(s5k4ec_af_area_tbl[4].reg_data - (unsigned short)cdata->cfg.focus_area.dx)<200) &&
+	   (abs(s5k4ec_af_area_tbl[5].reg_data - (unsigned short)cdata->cfg.focus_area.dy)<200) &&
+	   (abs(s5k4ec_af_area_tbl[6].reg_data - (unsigned short)cdata->cfg.focus_area.x)<200) &&
+	   (abs(s5k4ec_af_area_tbl[7].reg_data - (unsigned short)cdata->cfg.focus_area.y)<200) &&
+	   (abs(s5k4ec_af_area_tbl[8].reg_data - (unsigned short)cdata->cfg.focus_area.dx)<200) &&
+	   (abs(s5k4ec_af_area_tbl[9].reg_data - (unsigned short)cdata->cfg.focus_area.dy)<200)){
+		CDBG("%s area is same2 = %d\n", __func__, rc);
 		return 0;
 	}
 	

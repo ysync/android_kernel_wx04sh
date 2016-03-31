@@ -100,6 +100,8 @@
 	#define SHTPS_SYSTEM_BOOT_MODE_CHECK_ENABLE
 #endif /* CONFIG_SHBOOT_CUST ) */
 
+#define SHTPS_PROXIMITY_SUPPORT_ENABLE
+
 /* -----------------------------------------------------------------------------------
  */
 
@@ -405,6 +407,7 @@ struct shtps_drag_hist{
 struct shtps_lpwg_ctrl{
     u8                          lpwg_switch;
     u8                          is_notified;
+	u8							notify_enable;
     u8                          doze_wakeup_threshold;
     u8                          clip[2];
 	struct wake_lock            wake_lock;
@@ -414,6 +417,8 @@ struct shtps_lpwg_ctrl{
 	u8							block_touchevent;
 	unsigned long				wakeup_time;
 	u8							tu_rezero_req;
+	unsigned long				notify_time;
+	struct delayed_work			notify_interval_delayed_work;
 };
 #endif /* SHTPS_LPWG_MODE_ENABLE */
 
@@ -525,6 +530,7 @@ static u8						gLogOutputEnable = 0;
 		static int SHTPS_LPWG_NORMAL_0D_THRESHOLD = 		0x8C;
 		static int SHTPS_LPWG_QOS_LATENCY_DEF_VALUE = 		1999;
 		static int SHTPS_LPWG_BLOCK_TIME_MAX_MS = 				2000;
+		static int SHTPS_LPWG_MIN_NOTIFY_INTERVAL = 		1000;
 
 		#if defined( SHTPS_MODULE_PARAM_ENABLE )
 			module_param(SHTPS_LPWG_DOZE_INTERVAL_DEF, int, S_IRUGO | S_IWUSR);
@@ -540,6 +546,7 @@ static u8						gLogOutputEnable = 0;
 			module_param(SHTPS_LPWG_NORMAL_0D_THRESHOLD, int, S_IRUGO | S_IWUSR);
 			module_param(SHTPS_LPWG_QOS_LATENCY_DEF_VALUE, int, S_IRUGO | S_IWUSR);
 			module_param(SHTPS_LPWG_BLOCK_TIME_MAX_MS, int, S_IRUGO | S_IWUSR);
+			module_param(SHTPS_LPWG_MIN_NOTIFY_INTERVAL, int, S_IRUGO | S_IWUSR);
 		#endif /* SHTPS_MODULE_PARAM_ENABLE */
 	#else
 		#define SHTPS_LPWG_DOZE_INTERVAL_DEF				0x03
@@ -555,7 +562,22 @@ static u8						gLogOutputEnable = 0;
 		#define SHTPS_LPWG_NORMAL_0D_THRESHOLD	 			0x8C
 		#define SHTPS_LPWG_QOS_LATENCY_DEF_VALUE	 		1999
 		#define SHTPS_LPWG_BLOCK_TIME_MAX_MS	 		2000
+		#define SHTPS_LPWG_MIN_NOTIFY_INTERVAL	 			1000
 	#endif /* SHTPS_DEBUG_VARIABLE_DEFINES ) */
+
+	#if defined(SHTPS_PROXIMITY_SUPPORT_ENABLE)
+		#include <sharp/proximity.h>
+
+		#if defined( SHTPS_DEBUG_VARIABLE_DEFINES )
+			static int	SHTPS_LPWG_PROXIMITY_SUPPORT_ENABLE   = 1;
+
+			#if defined( SHTPS_MODULE_PARAM_ENABLE )
+				module_param(SHTPS_LPWG_PROXIMITY_SUPPORT_ENABLE, int, S_IRUGO | S_IWUSR);
+			#endif /* SHTPS_MODULE_PARAM_ENABLE */
+		#else
+			#define SHTPS_LPWG_PROXIMITY_SUPPORT_ENABLE		1
+		#endif /* SHTPS_DEBUG_VARIABLE_DEFINES ) */
+	#endif /* SHTPS_PROXIMITY_SUPPORT_ENABLE */
 #endif /* SHTPS_LPWG_MODE_ENABLE */
 /* -----------------------------------------------------------------------------------
  */
@@ -646,9 +668,9 @@ enum{
 };
 
 enum{
-	SHTPS_PHYSICAL_KEY_DOWN,
+	SHTPS_PHYSICAL_KEY_DOWN = 0,
 	SHTPS_PHYSICAL_KEY_UP,
-	SHTPS_PHYSICAL_KEY_POWER,
+	SHTPS_PHYSICAL_KEY_SWEEPON,
 	SHTPS_PHYSICAL_KEY_NUM,
 };
 
@@ -694,6 +716,18 @@ enum{
 	SHTPS_DRAG_DIR_PLUS,
 	SHTPS_DRAG_DIR_MINUS,
 };
+
+#if defined(SHTPS_PROXIMITY_SUPPORT_ENABLE)
+enum{
+	SHTPS_PROXIMITY_ENABLE = SH_PROXIMITY_ENABLE,
+	SHTPS_PROXIMITY_DISABLE = SH_PROXIMITY_DISABLE,
+};
+
+enum{
+	SHTPS_PROXIMITY_NEAR = SH_PROXIMITY_NEAR,
+	SHTPS_PROXIMITY_FAR = SH_PROXIMITY_FAR,
+};
+#endif /* SHTPS_PROXIMITY_SUPPORT_ENABLE */
 
 typedef int (shtps_state_func)(struct shtps_rmi_spi *ts, int param);
 struct shtps_state_func {
@@ -1067,6 +1101,38 @@ static int shtps_device_access_teardown(struct shtps_rmi_spi *ts)
 
 	return 0;
 }
+
+/* -----------------------------------------------------------------------------------
+ */
+#if defined(SHTPS_PROXIMITY_SUPPORT_ENABLE)
+static int shtps_proximity_state_check(struct shtps_rmi_spi *ts)
+{
+	int state = -1;
+	int data = -1;
+
+	SHTPS_LOG_DBG_PRINT("[proximity] check state start\n");
+	PROX_stateread_func(&state, &data);
+	SHTPS_LOG_DBG_PRINT("[proximity] check state end\n");
+
+	if (state == SHTPS_PROXIMITY_ENABLE &&
+		data == SHTPS_PROXIMITY_NEAR) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+static int shtps_proximity_check(struct shtps_rmi_spi *ts)
+{
+	int data = -1;
+
+	SHTPS_LOG_DBG_PRINT("[proximity] check start\n");
+	PROX_dataread_func(&data);
+	SHTPS_LOG_DBG_PRINT("[proximity] check end\n");
+
+	return data;
+}
+#endif /* SHTPS_PROXIMITY_SUPPORT_ENABLE */
 
 #if defined( SHTPS_SPI_FWBLOCKWRITE_ENABLE )
 /* -----------------------------------------------------------------------------------
@@ -2368,8 +2434,40 @@ static void shtps_set_charger_armor_init(struct shtps_rmi_spi *ts)
 }
 
 #if defined(SHTPS_LPWG_MODE_ENABLE)
+static void shtps_lpwg_notify_interval_delayed_work_function(struct work_struct *work)
+{
+	struct delayed_work *dw = container_of(work, struct delayed_work, work);
+	struct shtps_lpwg_ctrl *lpwg_p = container_of(dw, struct shtps_lpwg_ctrl, notify_interval_delayed_work);
+
+	SHTPS_LOG_FUNC_CALL();
+
+	mutex_lock(&shtps_ctrl_lock);
+	lpwg_p->notify_enable = 1;
+	mutex_unlock(&shtps_ctrl_lock);
+
+	SHTPS_LOG_DBG_PRINT("[LPWG] notify interval end\n");
+}
+
+static void shtps_lpwg_notify_interval_stop(struct shtps_rmi_spi *ts)
+{
+	SHTPS_LOG_FUNC_CALL();
+
+	cancel_delayed_work(&ts->lpwg.notify_interval_delayed_work);
+}
+
+static void shtps_lpwg_notify_interval_start(struct shtps_rmi_spi *ts)
+{
+	SHTPS_LOG_FUNC_CALL();
+
+	shtps_lpwg_notify_interval_stop(ts);
+	schedule_delayed_work(&ts->lpwg.notify_interval_delayed_work, msecs_to_jiffies(SHTPS_LPWG_MIN_NOTIFY_INTERVAL));
+
+	SHTPS_LOG_DBG_PRINT("[LPWG] notify interval start\n");
+}
+
 static void shtps_lpwg_wakelock_init(struct shtps_rmi_spi *ts)
 {
+	ts->lpwg.notify_enable = 1;
 	ts->lpwg.lpwg_switch = 0;
     wake_lock_init(&ts->lpwg.wake_lock, WAKE_LOCK_SUSPEND, "shtps_lpwg_wake_lock");
 	pm_qos_add_request(&ts->lpwg.pm_qos_lock_idle, PM_QOS_CPU_DMA_LATENCY, PM_QOS_DEFAULT_VALUE);
@@ -2377,6 +2475,7 @@ static void shtps_lpwg_wakelock_init(struct shtps_rmi_spi *ts)
 	if(ts->lpwg.pm_qos_idle_value == 0){
 		ts->lpwg.pm_qos_idle_value = SHTPS_LPWG_QOS_LATENCY_DEF_VALUE;
 	}
+	INIT_DELAYED_WORK(&ts->lpwg.notify_interval_delayed_work, shtps_lpwg_notify_interval_delayed_work_function);
 }
 
 static void shtps_lpwg_wakelock_destroy(struct shtps_rmi_spi *ts)
@@ -2408,6 +2507,8 @@ static void shtps_set_lpwg_mode_on(struct shtps_rmi_spi *ts)
 {
 	u8 data;
 
+	shtps_lpwg_notify_interval_stop(ts);
+	ts->lpwg.notify_enable = 1;
 	ts->lpwg.is_notified = 0;
 
     shtps_rmi_write(ts, ts->map.fn1A.ctrlBase + 0x13, SHTPS_LPWG_DOZE_0D_THRESHOLD);
@@ -2429,8 +2530,6 @@ static void shtps_set_lpwg_mode_on(struct shtps_rmi_spi *ts)
 static void shtps_set_lpwg_mode_off(struct shtps_rmi_spi *ts)
 {
 	u8 data;
-
-	ts->lpwg.is_notified = 0;
 
 	shtps_rmi_read(ts, ts->map.fn11.ctrlBase, &data, 1);
 	shtps_rmi_write(ts, ts->map.fn11.ctrlBase, (data & 0xF8) | 0x00);
@@ -3335,12 +3434,16 @@ static void shtps_notify_wakeup_event(struct shtps_rmi_spi *ts)
 	SHTPS_LOG_DBG_PRINT("wakeup touch blocked until rezero\n");
 	ts->lpwg.block_touchevent = 1;
 	ts->lpwg.is_notified = 1;
+	ts->lpwg.notify_time = jiffies;
+	ts->lpwg.notify_enable = 0;
 
-	input_report_key(ts->input_key, ts->keycodes[SHTPS_PHYSICAL_KEY_POWER], 1);
+	input_report_key(ts->input_key, ts->keycodes[SHTPS_PHYSICAL_KEY_SWEEPON], 1);
 	input_sync(ts->input_key);
 
-	input_report_key(ts->input_key, ts->keycodes[SHTPS_PHYSICAL_KEY_POWER], 0);
+	input_report_key(ts->input_key, ts->keycodes[SHTPS_PHYSICAL_KEY_SWEEPON], 0);
 	input_sync(ts->input_key);
+
+	shtps_lpwg_notify_interval_start(ts);
 }
 #endif /* SHTPS_LPWG_MODE_ENABLE */
 
@@ -3720,21 +3823,37 @@ static void shtps_read_touchevent_insleep(struct shtps_rmi_spi *ts, int state)
 	shtps_device_access_setup(ts);
 
 	status = shtps_rmi_read(ts, ts->map.fn01.dataBase, buf, 2);
+	shtps_rmi_read(ts, 0x0058, &val, 1);
+	SHTPS_LOG_DBG_PRINT("LPWG detect [status = 0x%02X]\n", val);
 
-	if (0 == ts->lpwg.is_notified)
-	{
-		if(status){
-			shtps_notify_wakeup_event(ts);
-		}else{
-			shtps_rmi_read(ts, 0x0058, &val, 1);
-			SHTPS_LOG_DBG_PRINT("LPWG detect [status = 0x%02X]\n", val);
-
-			if((val & SHTPS_LPWG_DOZE_CTL) != 0){
-				shtps_notify_wakeup_event(ts);
-			}else{
-				SHTPS_LOG_ERR_PRINT("LPWG: unknown interrupt source detection!! [0x%02X]\n", val);\
+	if((val & SHTPS_LPWG_DOZE_CTL) != 0){
+		if(ts->lpwg.notify_enable != 0){
+			#if defined(SHTPS_PROXIMITY_SUPPORT_ENABLE)
+			{
+				if(SHTPS_LPWG_PROXIMITY_SUPPORT_ENABLE != 0){
+					if (shtps_proximity_state_check(ts) == 0) {
+						if( shtps_proximity_check(ts) != SHTPS_PROXIMITY_NEAR ){
+							shtps_notify_wakeup_event(ts);
+						}else{
+							SHTPS_LOG_DBG_PRINT("[LPWG] proximity near\n");
+						}
+					}else{
+						SHTPS_LOG_DBG_PRINT("[LPWG] proximity power_on + near\n");
+					}
+				}
+				else{
+					shtps_notify_wakeup_event(ts);
+				}
 			}
+			#else
+				shtps_notify_wakeup_event(ts);
+			#endif /* SHTPS_PROXIMITY_SUPPORT_ENABLE */
 		}
+		else{
+			SHTPS_LOG_DBG_PRINT("[LPWG] notify event blocked\n");
+		}
+	}else{
+	    SHTPS_LOG_DBG_PRINT("[LPWG] unknown interrupt source detection!! [0x%02X]\n", val);\
 	}
 
 	shtps_device_access_teardown(ts);
@@ -5943,6 +6062,7 @@ static int shtps_ioctl_lpwg_enable(struct shtps_rmi_spi *ts, unsigned long arg)
 {
     mutex_lock(&shtps_loader_lock);
 	ts->lpwg.lpwg_switch = arg;
+	ts->lpwg.notify_enable = 1;
     SHTPS_LOG_DBG_PRINT(" [LPWG] lpwg_switch = %d\n", ts->lpwg.lpwg_switch);
     if (SHTPS_STATE_SLEEP == ts->state_mgr.state) 
     {
@@ -6477,7 +6597,7 @@ static int __devinit shtps_rmi_probe(struct spi_device *spi)
 		input_dev_key->keycodesize = sizeof(ts->keycodes);
 		ts->keycodes[SHTPS_PHYSICAL_KEY_DOWN] = KEY_VOLUMEDOWN;
 		ts->keycodes[SHTPS_PHYSICAL_KEY_UP] = KEY_VOLUMEUP;
-		ts->keycodes[SHTPS_PHYSICAL_KEY_POWER] = KEY_SWEEPON;
+		ts->keycodes[SHTPS_PHYSICAL_KEY_SWEEPON] = KEY_SWEEPON;
 
 		__set_bit(KEY_VOLUMEDOWN, input_dev_key->keybit);
 		__set_bit(KEY_VOLUMEUP, input_dev_key->keybit);
@@ -6506,6 +6626,7 @@ static int __devinit shtps_rmi_probe(struct spi_device *spi)
 	#if defined(SHTPS_SYSTEM_BOOT_MODE_CHECK_ENABLE)
 		ts->system_boot_mode = sh_boot_get_bootmode();
 	#endif /* SHTPS_SYSTEM_BOOT_MODE_CHECK_ENABLE */
+
 	shtps_performance_check_init();
 
 	SHTPS_LOG_DBG_PRINT("shtps_rmi_probe() done\n");

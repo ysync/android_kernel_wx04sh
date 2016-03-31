@@ -43,9 +43,10 @@
 
 #define VERSION_KEY_MASK	0xFFFFFF00
 
-#ifdef CONFIG_SHLCDC_BOARD /* CUST_ID_00058 */ /* CUST_ID_00095 */
+#ifdef CONFIG_SHLCDC_BOARD /* CUST_ID_00058 */ /* CUST_ID_00095 */ /* CUST_ID_00188 */
 extern int overlay_start;
 extern int overlay_stop;
+extern int overlay_trick_execute;
 extern void mdp_req_overlay_set_debug(struct mdp_overlay *req);
 extern void mdp_req_overlay_id_debug(int id);
 extern void mdp_req_overlay_play_debug(struct msmfb_overlay_data *req);
@@ -3747,7 +3748,7 @@ end:
 	mutex_unlock(&mfd->dma->ov_mutex);
 
 #endif	/* CUST_ID_00141 */
-#ifdef CONFIG_SHLCDC_BOARD /* CUST_ID_00007 */ /* CUST_ID_00008 */ /* CUST_ID_00009 */ /* CUST_ID_00029 */ /* CUST_ID_00058 */
+#ifdef CONFIG_SHLCDC_BOARD /* CUST_ID_00007 */ /* CUST_ID_00008 */ /* CUST_ID_00009 */ /* CUST_ID_00029 */ /* CUST_ID_00058 */ /* CUST_ID_00188 */
 	if (pipe->pipe_num <= OVERLAY_PIPE_VG2) {
 		if ((mfd->panel_info.pdest == DISPLAY_1)
 				&& (mdp4_overlay_format2type(pipe->src_format) == OVERLAY_TYPE_VIDEO)) {
@@ -3773,7 +3774,7 @@ end:
 	if (mfd->panel.type == MIPI_VIDEO_PANEL) {
 		if (overlay_start && (pipe->mixer_stage == MDP4_MIXER_STAGE3)
 					 && (pipe->dst_w == info->var.xres) && (pipe->dst_h == info->var.yres)) {
-			mdp_dma_abl_lut_set_overlay(info);
+			overlay_trick_execute = 1;
 			overlay_start = 0;
 		}
 	}

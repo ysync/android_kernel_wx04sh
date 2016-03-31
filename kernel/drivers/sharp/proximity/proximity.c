@@ -58,23 +58,45 @@
 #define MODEL_TYPE_D2		0x04
 #define MODEL_TYPE_D3		0x05
 
-#if PROX_DEBUG_FUNC
-#define FUNC_LOG() printk(KERN_DEBUG "[PROXIMITY] %s is called\n", __func__)
-#else
-#define FUNC_LOG()
-#endif
+/* adb debug_log */
+static int	proximity_dbg_func_log = 0;		/* log : Init = OFF */
+static int	proximity_dbg_func_fin_log = 0;	/* log : Init = OFF */
+static int	proximity_dbg_enable_log = 0;	/* log : Init = OFF */
+static int	proximity_dbg_sensor_log = 0;	/* log : Init = OFF */
+static int	proximity_dbg_error_log = 1;	/* log : Init = ON  */
 
-#if PROX_DEBUG_FUNC_FIN
-#define FUNC_FIN_LOG() printk(KERN_DEBUG "[PROXIMITY] %s is finished\n", __func__)
-#else
-#define FUNC_FIN_LOG()
-#endif
+#if defined (CONFIG_ANDROID_ENGINEERING)
+	module_param(proximity_dbg_func_log, int, 0600);
+	module_param(proximity_dbg_func_fin_log, int, 0600);
+	module_param(proximity_dbg_enable_log, int, 0600);
+	module_param(proximity_dbg_sensor_log, int, 0600);
+	module_param(proximity_dbg_error_log, int, 0600);
+#endif  /* CONFIG_ANDROID_ENGINEERING */
 
-#if PROX_DEBUG_MSG
-#define DEBUG_LOG(format, ...) printk(KERN_DEBUG "[PROXIMITY] " format "\n", ## __VA_ARGS__)
-#else
-#define DEBUG_LOG(format, ...)
-#endif
+#define FUNC_LOG() \
+	if(proximity_dbg_func_log == 1){ \
+		printk(KERN_DEBUG "[PROXIMITY] %s is called\n", __func__); \
+	}
+
+#define FUNC_FIN_LOG() \
+	if(proximity_dbg_func_fin_log == 1){ \
+		printk(KERN_DEBUG "[PROXIMITY] %s is finished\n", __func__); \
+	}
+
+#define DEBUG_LOG(format, ...) \
+	if(proximity_dbg_enable_log == 1){ \
+		printk(KERN_DEBUG "[PROXIMITY][%s] " format "\n", __func__, ## __VA_ARGS__); \
+	}
+
+#define DEBUG_SENSOR_LOG(format, ...) \
+	if(proximity_dbg_sensor_log == 1){ \
+		printk(KERN_DEBUG "[PROXIMITY][%s] " format "\n", __func__, ## __VA_ARGS__); \
+	}
+
+#define DEBUG_ERROR_LOG(format, ...) \
+	if(proximity_dbg_error_log == 1){ \
+		printk(KERN_DEBUG "[PROXIMITY][%s] " format "\n", __func__, ## __VA_ARGS__); \
+	}
 
 /*+-------------------------------------------------------------------------+*/
 /*|																			|*/
@@ -100,6 +122,7 @@ static drv_data 	*poProximityRec;
 static atomic_t		open_flag = ATOMIC_INIT(0);
 static atomic_t		sensor_data = ATOMIC_INIT(7);	/* Init = Far */
 static atomic_t		enable_mode = ATOMIC_INIT(0);	/* 0=Disable,1=Enable */
+static atomic_t     dataread_func_flag = ATOMIC_INIT(0);  /* 0=Disable,1=Enable */
 
 //static struct regulator *vreg_vl8;
 
@@ -108,6 +131,8 @@ static void PROX_Irq_workfunc( void );
 
 static struct wake_lock prox_timeout_wake_lock;
 static struct wake_lock prox_wake_lock;
+
+static struct mutex prox_enable_lock;
 
 static uint16_t sh_get_hw_revision(void)
 {
@@ -226,10 +251,13 @@ static int IOECS_Enable(void)
 
 	struct shdisp_prox_params prox_params;
 
+    mutex_lock(&prox_enable_lock);
+
 	FUNC_LOG();
 
 	if(atomic_read(&enable_mode) == 0)
 	{
+	  if(atomic_read(&dataread_func_flag) != 1){
 		rev = sh_get_hw_revision();
 		rev = rev & 0x07;
 		DEBUG_LOG("hw_revision = %02X",rev);
@@ -252,12 +280,14 @@ static int IOECS_Enable(void)
 		if(nResult != SHDISP_RESULT_SUCCESS){
 			DEBUG_LOG("I2C PowerON Error");
 			nResult = -1;
+			mutex_unlock(&prox_enable_lock);
 			return nResult;
 		}
-	
-		atomic_set(&enable_mode, 1);
-		msleep(150);
+	  atomic_set(&enable_mode, 1);
+	  msleep(150);
+	  }
 	}
+    mutex_unlock(&prox_enable_lock);
 	return nResult;
 }
 
@@ -269,10 +299,13 @@ static int IOECS_Enable(void)
 
 	struct shdisp_prox_params prox_params;
 
+    mutex_lock(&prox_enable_lock);
+
 	FUNC_LOG();
 
 	if(atomic_read(&enable_mode) == 0)
 	{
+	  if(atomic_read(&dataread_func_flag) != 1){
 		rev = sh_get_hw_revision();
 		rev = rev & 0x07;
 		DEBUG_LOG("hw_revision = %02X",rev);
@@ -285,11 +318,14 @@ static int IOECS_Enable(void)
 		if(nResult != SHDISP_RESULT_SUCCESS){
 			DEBUG_LOG("I2C PowerON Error");
 			nResult = -1;
+			mutex_unlock(&prox_enable_lock);
 			return nResult;
 		}
-		atomic_set(&enable_mode, 1);
-		msleep(150);
+	  }
+	  atomic_set(&enable_mode, 1);
+	  msleep(150);
 	}
+    mutex_unlock(&prox_enable_lock);
 	return nResult;
 }
 
@@ -303,10 +339,13 @@ static int IOECS_Enable(void)
 
 	struct shdisp_prox_params prox_params;
 
+    mutex_lock(&prox_enable_lock);
+
 	FUNC_LOG();
 
 	if(atomic_read(&enable_mode) == 0)
 	{
+	  if(atomic_read(&dataread_func_flag) != 1){
 		rev = sh_get_hw_revision();
 		rev = rev & 0x07;
 		DEBUG_LOG("hw_revision = %02X",rev);
@@ -329,12 +368,14 @@ static int IOECS_Enable(void)
 		if(nResult != SHDISP_RESULT_SUCCESS){
 			DEBUG_LOG("I2C PowerON Error");
 			nResult = -1;
+			mutex_unlock(&prox_enable_lock);
 			return nResult;
 		}
-	
-		atomic_set(&enable_mode, 1);
-		msleep(150);
+	  atomic_set(&enable_mode, 1);
+	  msleep(150);
+	  }
 	}
+    mutex_unlock(&prox_enable_lock);
 	return nResult;
 }
 
@@ -348,10 +389,13 @@ static int IOECS_Enable(void)
 
 	struct shdisp_prox_params prox_params;
 
+    mutex_lock(&prox_enable_lock);
+
 	FUNC_LOG();
 
 	if(atomic_read(&enable_mode) == 0)
 	{
+	  if(atomic_read(&dataread_func_flag) != 1){
 		rev = sh_get_hw_revision();
 		rev = rev & 0x07;
 		DEBUG_LOG("hw_revision = %02X",rev);
@@ -374,12 +418,14 @@ static int IOECS_Enable(void)
 		if(nResult != SHDISP_RESULT_SUCCESS){
 			DEBUG_LOG("I2C PowerON Error");
 			nResult = -1;
+			mutex_unlock(&prox_enable_lock);
 			return nResult;
 		}
-	
-		atomic_set(&enable_mode, 1);
-		msleep(150);
+	  atomic_set(&enable_mode, 1);
+	  msleep(150);
+	  }
 	}
+	mutex_unlock(&prox_enable_lock);
 	return nResult;
 }
 
@@ -393,10 +439,13 @@ static int IOECS_Enable(void)
 
 	struct shdisp_prox_params prox_params;
 
+    mutex_lock(&prox_enable_lock);
+
 	FUNC_LOG();
 
 	if(atomic_read(&enable_mode) == 0)
 	{
+	  if(atomic_read(&dataread_func_flag) != 1){
 		rev = sh_get_hw_revision();
 		rev = rev & 0x07;
 		DEBUG_LOG("hw_revision = %02X",rev);
@@ -419,12 +468,14 @@ static int IOECS_Enable(void)
 		if(nResult != SHDISP_RESULT_SUCCESS){
 			DEBUG_LOG("I2C PowerON Error");
 			nResult = -1;
+			mutex_unlock(&prox_enable_lock);
 			return nResult;
 		}
-	
-		atomic_set(&enable_mode, 1);
-		msleep(150);
+	  atomic_set(&enable_mode, 1);
+	  msleep(150);
+	  }
 	}
+    mutex_unlock(&prox_enable_lock);
 	return nResult;
 }
 
@@ -439,10 +490,13 @@ static int IOECS_Enable(void)
 
 	struct shdisp_prox_params prox_params;
 
+    mutex_lock(&prox_enable_lock);
+
 	FUNC_LOG();
 
 	if(atomic_read(&enable_mode) == 0)
 	{
+	  if(atomic_read(&dataread_func_flag) != 1){
 		rev = sh_get_hw_revision();
 		rev = rev & 0x07;
 		DEBUG_LOG("hw_revision = %02X",rev);
@@ -459,23 +513,24 @@ static int IOECS_Enable(void)
 		if(nResult != SHDISP_RESULT_SUCCESS){
 			DEBUG_LOG("I2C PowerON Error");
 			nResult = -1;
+			mutex_unlock(&prox_enable_lock);
 			return nResult;
 		}
-             
-		nResult = PROX_I2cRead(GP2AP030_REG_COMMAND1, &rData);
-		if(nResult != 0){
-			DEBUG_LOG("I2CRead_Error");
-		}
-		rData = (rData & 0x08);
+	  }
+	  nResult = PROX_I2cRead(GP2AP030_REG_COMMAND1, &rData);
+	  if(nResult != 0){
+		DEBUG_LOG("I2CRead_Error");
+	  }
+	  rData = (rData & 0x08);
 
-		if(0x08 == rData){
-			atomic_set(&sensor_data, 0);
-		}else {
-			atomic_set(&sensor_data, 7);
-		}
-
-		atomic_set(&enable_mode, 1);
+	  if(0x08 == rData){
+		atomic_set(&sensor_data, 0);
+	  }else {
+		atomic_set(&sensor_data, 7);
+	  }
+	  atomic_set(&enable_mode, 1);
 	}
+	mutex_unlock(&prox_enable_lock);
 	return nResult;
 }
 #endif
@@ -485,6 +540,8 @@ static int IOECS_Disable(void)
 	int nResult = -1;
 	uint16_t rev;
 	
+    mutex_lock(&prox_enable_lock);
+
 	FUNC_LOG();
 
 	if(atomic_read(&enable_mode) == 1)
@@ -505,14 +562,18 @@ static int IOECS_Disable(void)
 
 		prox_unsubscribe();
 
-		nResult = shdisp_api_prox_sensor_pow_ctl(SHDISP_PROX_SENSOR_POWER_OFF, NULL);
-		if(nResult != SHDISP_RESULT_SUCCESS){
-			DEBUG_LOG("I2C PowerOFF Error");
-			nResult = -1;
-			return nResult;
+        if(atomic_read(&dataread_func_flag) != 1){
+			nResult = shdisp_api_prox_sensor_pow_ctl(SHDISP_PROX_SENSOR_POWER_OFF, NULL);
+			if(nResult != SHDISP_RESULT_SUCCESS){
+				DEBUG_LOG("I2C PowerOFF Error");
+				nResult = -1;
+				mutex_unlock(&prox_enable_lock);
+				return nResult;
+			}
 		}
 		atomic_set(&enable_mode, 0);
 	}
+    mutex_unlock(&prox_enable_lock);
 	return nResult;
 }
 
@@ -612,7 +673,9 @@ static int PROX_release(struct inode *inode, struct file *filp)
 {
 	FUNC_LOG();
 
-	IOECS_Disable();
+    if(atomic_read(&dataread_func_flag) != 1){
+		IOECS_Disable();
+	}
 
 	atomic_set(&open_flag, 0);
 
@@ -822,6 +885,145 @@ static void PROX_Irq_workfunc( void )
 #endif
 	FUNC_FIN_LOG();
 	wake_unlock(&prox_wake_lock);
+}
+
+/* ------------------------------------------------------------------------- */
+/* PROX_dataread_func                                                        */
+/* ------------------------------------------------------------------------- */
+int PROX_dataread_func(int *read_data)
+{
+    int nResult = SH_PROXIMITY_RESULT_FAILURE;
+    struct shdisp_prox_params prox_params;
+    unsigned short proxadj[2];
+    sharp_smem_common_type *p_sh_smem_common_type = NULL;
+    unsigned char rData = 0x00;
+
+    FUNC_LOG();
+
+    mutex_lock(&prox_enable_lock);
+
+	if(atomic_read(&enable_mode) != 1){
+
+        memset((void*)proxadj, 0x00, sizeof(proxadj));
+        p_sh_smem_common_type = sh_smem_get_common_address();
+
+    #ifdef PROX_USE_SMEM
+        if (p_sh_smem_common_type != NULL) {
+            memcpy(proxadj, p_sh_smem_common_type->shdiag_proxadj, sizeof(proxadj));
+            prox_params.threshold_low = proxadj[0];
+            prox_params.threshold_high = proxadj[1];
+            DEBUG_LOG("[%s][smem] LT:0x%04x, HT:0x%04x.\n", __func__, prox_params.threshold_low, prox_params.threshold_high);
+        } else {
+            prox_params.threshold_low = Threshold_Low;
+            prox_params.threshold_high = Threshold_High;
+            DEBUG_LOG("[%s][local] LT:0x%04x, HT:0x%04x.\n", __func__, prox_params.threshold_low, prox_params.threshold_high);
+        }
+    #else   /* PROX_USE_SMEM */
+            prox_params.threshold_low = Threshold_Low;
+            prox_params.threshold_high = Threshold_High;
+            DEBUG_LOG("[%s][local] LT:0x%04x, HT:0x%04x.\n", __func__, prox_params.threshold_low, prox_params.threshold_high);
+    #endif  /* PROX_USE_SMEM */
+
+        nResult = shdisp_api_prox_sensor_pow_ctl(SHDISP_PROX_SENSOR_POWER_ON, &prox_params);
+        if(nResult != SHDISP_RESULT_SUCCESS) {
+            DEBUG_ERROR_LOG("PowerON Error");
+            nResult = SH_PROXIMITY_RESULT_FAILURE;
+            *read_data = SH_PROXIMITY_FAR;
+            mutex_unlock(&prox_enable_lock);
+            return nResult;
+        }
+
+        atomic_set(&dataread_func_flag, 1);
+	}
+
+	nResult = PROX_I2cRead(GP2AP030_REG_COMMAND1, &rData);
+	if(nResult != 0){
+		*read_data = SH_PROXIMITY_FAR;
+		DEBUG_LOG("I2CRead_Error");
+	}else{
+		rData = (rData & 0x08);
+		if(0x08 == rData){
+			*read_data = SH_PROXIMITY_NEAR;
+		}else {
+			*read_data = SH_PROXIMITY_FAR;
+		}
+	}
+
+    DEBUG_SENSOR_LOG("PROX_dataread_func = %d",*read_data);
+
+    mutex_unlock(&prox_enable_lock);
+
+    mutex_lock(&prox_enable_lock);
+
+    if(atomic_read(&enable_mode) != 1){
+
+        nResult = shdisp_api_prox_sensor_pow_ctl(SHDISP_PROX_SENSOR_POWER_OFF, NULL);
+        if(nResult != SHDISP_RESULT_SUCCESS) {
+            DEBUG_ERROR_LOG("PowerOFF Error");
+            nResult = SH_PROXIMITY_RESULT_FAILURE;
+            atomic_set(&dataread_func_flag, 0);
+            mutex_unlock(&prox_enable_lock);
+            return nResult;
+        }
+    }
+    atomic_set(&dataread_func_flag, 0);
+    mutex_unlock(&prox_enable_lock);
+
+    FUNC_FIN_LOG();
+    
+    return SH_PROXIMITY_RESULT_SUCCESS;
+}
+
+int PROX_dataread_disable_func(void)
+{
+	FUNC_LOG();
+
+	FUNC_FIN_LOG();
+	return SH_PROXIMITY_RESULT_SUCCESS;
+}
+
+/* ------------------------------------------------------------------------- */
+/* PROX_stateread_func                                                       */
+/* ------------------------------------------------------------------------- */
+int PROX_stateread_func(int *state_data, int *read_data)
+{
+	int nResult = SH_PROXIMITY_RESULT_FAILURE;
+    	unsigned char rData = 0x00;
+
+	mutex_lock(&prox_enable_lock);
+
+	FUNC_LOG();
+
+	if (atomic_read(&enable_mode) == 0) {
+		DEBUG_LOG("Proximity Sensor Disable");
+		*state_data = SH_PROXIMITY_DISABLE;
+		*read_data = -1;
+		mutex_unlock(&prox_enable_lock);
+		return SH_PROXIMITY_RESULT_SUCCESS;
+	}
+
+	DEBUG_LOG("Proximity Sensor Enable");
+	*state_data = SH_PROXIMITY_ENABLE;
+
+        nResult = PROX_I2cRead(GP2AP030_REG_COMMAND1, &rData);
+	if(nResult != 0){
+		*read_data = SH_PROXIMITY_FAR;
+		DEBUG_LOG("I2CRead_Error");
+	}else{
+		rData = (rData & 0x08);
+		if(0x08 == rData){
+			*read_data = SH_PROXIMITY_NEAR;
+		}else {
+			*read_data = SH_PROXIMITY_FAR;
+		}
+	}
+
+	DEBUG_SENSOR_LOG("PROX_stateread_func = %d",*read_data);
+
+	FUNC_FIN_LOG();
+
+	mutex_unlock(&prox_enable_lock);
+	return SH_PROXIMITY_RESULT_SUCCESS;
 }
 
 //static int PROX_ConfigGPIO(void)
@@ -1121,6 +1323,7 @@ static int __init PROX_Init(void)
 
 	wake_lock_init(&prox_timeout_wake_lock, WAKE_LOCK_SUSPEND, "prox_timeout_wake_lock");
 	wake_lock_init(&prox_wake_lock, WAKE_LOCK_SUSPEND, "proximity_wake_lock");
+    mutex_init(&prox_enable_lock);
 
 	return PROX_Probe();
 }
